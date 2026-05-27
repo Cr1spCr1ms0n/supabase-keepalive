@@ -1,0 +1,35 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    - cron: '0 8 */4 * *'  # Every 4 days at 08:00 UTC — well inside the 7-day pause threshold
+  workflow_dispatch:        # Manual trigger from GitHub Actions UI
+
+jobs:
+  ping:
+    name: Ping Supabase Project
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping health endpoint
+        run: |
+          RESPONSE=$(curl --silent --show-error --fail \
+            --max-time 15 \
+            "${{ secrets.SUPABASE_URL }}/health")
+
+          echo "Response: $RESPONSE"
+
+          STATUS=$(echo "$RESPONSE" | jq -r '.status // "unknown"')
+
+          if [ "$STATUS" = "ok" ]; then
+            echo "✅ Project is healthy."
+          else
+            echo "⚠️  Unexpected status: $STATUS"
+            exit 1
+          fi
+
+      - name: Log run
+        if: always()
+        run: |
+          echo "Ran at: $(date -u)"
+          echo "Project URL: ${{ secrets.SUPABASE_URL }}"
