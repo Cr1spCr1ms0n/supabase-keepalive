@@ -1,0 +1,36 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    - cron: '0 8 */4 * *'  # Every 4 days at 08:00 UTC — well inside the 7-day pause threshold
+  workflow_dispatch:        # Manual trigger from GitHub Actions UI
+
+jobs:
+  ping:
+    name: Ping Supabase Project
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Query Supabase database
+        run: |
+          HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+            --max-time 15 \
+            -X POST \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"p_project_id": "7f945045-e145-436f-a882-5de8129276a0"}' \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/get_pending_dispatch")
+
+          echo "HTTP status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 500 ]; then
+            echo "Database reached (HTTP $HTTP_STATUS). Activity registered."
+          else
+            echo "Unexpected status: $HTTP_STATUS"
+            exit 1
+          fi
+
+      - name: Log run
+        if: always()
+        run: echo "Ran at $(date -u) against ${{ secrets.SUPABASE_URL }}"
